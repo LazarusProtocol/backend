@@ -1,0 +1,69 @@
+name: lazarus-backend
+
+services:
+  backend:
+    container_name: lazarus-backend
+    build: .
+    command: >
+      sh -c "python manage.py collectstatic --noinput &&
+             python manage.py migrate --noinput &&
+             gunicorn lazarus_backend.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 60"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-lazarus-dev-secret-key-change-in-production}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_DB: ${POSTGRES_DB:-lazarus_db}
+      POSTGRES_USER: ${POSTGRES_USER:-lazarus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lazarus}
+      POSTGRES_HOST: ${POSTGRES_HOST:-host.docker.internal}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      REDIS_CACHE_URL: ${REDIS_CACHE_URL:-redis://host.docker.internal:6379/1}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://host.docker.internal:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://host.docker.internal:6379/0}
+      CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-false}
+      LAZARUS_VAULT_CONTRACT_ID: ${LAZARUS_VAULT_CONTRACT_ID:-CCWAH7BVPGYOEBPRFWPZIONBYUCCQH7OARGZLOD6ZV66SOAFBVA2DHD5}
+      LAZARUS_SOROBAN_RPC_URL: ${LAZARUS_SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
+      LAZARUS_ATTESTATION_ENCLAVE_URL: ${LAZARUS_ATTESTATION_ENCLAVE_URL:-http://host.docker.internal:8085}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - 8000
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+  celery-worker:
+    container_name: lazarus-celery-worker
+    build: .
+    command: ["celery", "-A", "lazarus_backend", "worker", "-l", "info", "--concurrency=2"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-lazarus-dev-secret-key-change-in-production}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DATABASE_URL: ${DATABASE_URL:-}
+      POSTGRES_DB: ${POSTGRES_DB:-lazarus_db}
+      POSTGRES_USER: ${POSTGRES_USER:-lazarus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lazarus}
+      POSTGRES_HOST: ${POSTGRES_HOST:-host.docker.internal}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      REDIS_CACHE_URL: ${REDIS_CACHE_URL:-redis://host.docker.internal:6379/1}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://host.docker.internal:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://host.docker.internal:6379/0}
+      LAZARUS_VAULT_CONTRACT_ID: ${LAZARUS_VAULT_CONTRACT_ID:-CCWAH7BVPGYOEBPRFWPZIONBYUCCQH7OARGZLOD6ZV66SOAFBVA2DHD5}
+      LAZARUS_SOROBAN_RPC_URL: ${LAZARUS_SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
+      LAZARUS_ATTESTATION_ENCLAVE_URL: ${LAZARUS_ATTESTATION_ENCLAVE_URL:-http://host.docker.internal:8085}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true
